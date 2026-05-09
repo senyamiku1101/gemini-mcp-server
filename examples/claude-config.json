@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "gemini-mcp": {
+      "command": "/path/to/python",
+      "args": ["/path/to/gemini_mcp_server.py"],
+      "env": {
+        "GEMINI_FLASH_MODEL": "gemini-3.1-flash",
+        "GEMINI_PRO_MODEL": "gemini-3.1-pro",
+        "HTTP_PROXY": "http://127.0.0.1:7897",
+        "HTTPS_PROXY": "http://127.0.0.1:7897"
+      },
+      "type": "stdio"
+    }
+  }
+}
