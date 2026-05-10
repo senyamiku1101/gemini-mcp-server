@@ -283,15 +283,7 @@ async def execute_gemini_cli_streaming(
     logger.info(f"Selected model: {model_name} ({model_type})")
 
     try:
-        # Try API first if key is available
-        if GOOGLE_API_KEY:
-            logger.info("Attempting direct API call")
-            result = await execute_gemini_api(prompt, model_name)
-            if result["success"]:
-                return result
-            logger.warning("API call failed, falling back to CLI")
-
-        # Fallback to CLI
+        # CLI-first approach: use Gemini CLI by default, fall back to API only on failure
         import platform
         import subprocess as sp
 
@@ -354,6 +346,15 @@ async def execute_gemini_cli_streaming(
         if result_holder["returncode"] == 0:
             logger.info("Gemini CLI execution successful")
             return {"success": True, "output": full_output}
+
+        # CLI failed, try API fallback if key is available
+        if GOOGLE_API_KEY:
+            logger.warning("CLI failed, attempting API fallback")
+            result = await execute_gemini_api(prompt, model_name)
+            if result["success"]:
+                return result
+            logger.error("API fallback also failed")
+
         else:
             import re
             sanitized_stderr = re.sub(

@@ -23,7 +23,7 @@ This project solves all of them with:
 
 - **3 MCP Tools**: quick query, code analysis, codebase analysis
 - **Smart model selection**: flash for speed, pro for deep analysis
-- **API-first, CLI-fallback**: uses Google Generative AI SDK if API key available, falls back to Gemini CLI
+- **CLI-first, API-fallback**: uses Gemini CLI by default, falls back to Google Generative AI SDK if CLI fails
 - **Security**: prompt injection prevention, path traversal defense, API key redaction in errors
 - **Windows support**: proxy configuration, proper subprocess management
 
@@ -77,7 +77,7 @@ Add to your `~/.claude.json` (Claude Code MCP settings):
 |---|---|---|---|
 | `GEMINI_FLASH_MODEL` | No | `gemini-2.5-flash` | Model for quick queries |
 | `GEMINI_PRO_MODEL` | No | `gemini-2.5-pro` | Model for deep analysis |
-| `GOOGLE_API_KEY` | No | - | API key for direct API calls (optional, falls back to CLI) |
+| `GOOGLE_API_KEY` | No | - | API key for fallback API calls (optional, CLI is used by default) |
 | `HTTP_PROXY` | No | - | HTTP proxy address |
 | `HTTPS_PROXY` | No | - | HTTPS proxy address |
 

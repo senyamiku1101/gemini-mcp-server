@@ -22,7 +22,7 @@
 
 - **3 个 MCP 工具**：快速问答、代码分析、代码库分析
 - **智能模型选择**：flash 模型用于快速响应，pro 模型用于深度分析
-- **API 优先、CLI 回退**：有 API Key 时直接调用 SDK，否则回退到 Gemini CLI
+- **CLI 优先、API 回退**：默认使用 Gemini CLI，CLI 失败时回退到 Google Generative AI SDK
 - **安全防护**：Prompt 注入防御、路径遍历防护、API Key 脱敏
 - **Windows 支持**：代理配置、正确的子进程管理
 
@@ -76,7 +76,7 @@ python -m venv .venv
 |---|---|---|---|
 | `GEMINI_FLASH_MODEL` | 否 | `gemini-2.5-flash` | 快速问答使用的模型 |
 | `GEMINI_PRO_MODEL` | 否 | `gemini-2.5-pro` | 深度分析使用的模型 |
-| `GOOGLE_API_KEY` | 否 | - | API Key，设置后直接调用 SDK（可选，否则回退到 CLI） |
+| `GOOGLE_API_KEY` | 否 | - | API Key，CLI 失败时的回退方案（可选，默认使用 CLI） |
 | `HTTP_PROXY` | 否 | - | HTTP 代理地址 |
 | `HTTPS_PROXY` | 否 | - | HTTPS 代理地址 |
 

@@ -244,7 +244,7 @@ def execute_gemini_cli(
 def execute_gemini_smart(
     prompt: str, task_type: str = "quick_query", show_progress: bool = True
 ) -> dict:
-    """Smart execution: try API first, fall back to CLI if needed"""
+    """Smart execution: CLI first, fall back to API if needed"""
 
     # Select appropriate model
     model_type = MODEL_ASSIGNMENTS.get(task_type, "flash")
@@ -254,21 +254,25 @@ def execute_gemini_smart(
         print(f"📝 Task: {task_type}", file=sys.stderr)
         print(f"🤖 Selected model: {model_name} ({model_type})", file=sys.stderr)
 
-    # Try API first if key is available
+    # CLI-first: try Gemini CLI by default
+    if show_progress:
+        print("🔧 Using Gemini CLI...", file=sys.stderr)
+    result = execute_gemini_cli(prompt, model_name, show_progress)
+    if result["success"]:
+        return result
+
+    # CLI failed, try API fallback if key is available
     if GOOGLE_API_KEY:
         if show_progress:
-            print("🚀 Attempting direct API call...", file=sys.stderr)
+            print("🔄 CLI failed, falling back to API...", file=sys.stderr)
         result = execute_gemini_api(prompt, model_name, show_progress)
         if result["success"]:
             return result
-        if show_progress:
-            print("🔄 API failed, falling back to CLI...", file=sys.stderr)
     else:
         if show_progress:
-            print("📝 No API key found, using CLI directly", file=sys.stderr)
+            print("⚠️ No API key available for fallback", file=sys.stderr)
 
-    # Fallback to CLI
-    return execute_gemini_cli(prompt, model_name, show_progress)
+    return result
 
 
 def quick_query(query: str, context: str = "") -> None:
