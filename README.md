@@ -90,6 +90,29 @@ Add to your `~/.claude.json` (Claude Code MCP settings):
 | `HTTP_PROXY` | No | - | HTTP proxy address |
 | `HTTPS_PROXY` | No | - | HTTPS proxy address |
 
+## Project Structure
+
+```
+gemini-mcp-server/
+├── gemini_core.py          # Shared primitives: CLI resolver, scanner,
+│                           # sanitiser, redactor, path validation
+├── gemini_mcp_server.py    # MCP stdio server — used by Claude Code
+├── gemini_helper.py        # Standalone CLI helper (no MCP needed)
+├── tests/
+│   └── test_core.py        # 39-case pytest suite for gemini_core
+├── examples/
+│   └── claude-config.json  # Example Claude Code MCP config
+├── proxy-wrapper/          # Archived Node.js proxy wrapper
+├── requirements.txt        # Runtime deps (mcp, anyio, google-generativeai)
+└── requirements-dev.txt    # + pytest for development
+```
+
+The split keeps logic in one place: `gemini_core` owns the things both the
+MCP server and the CLI helper need (subprocess launcher, scanner, path
+checks). The two entry-point modules are thin and free to evolve their
+own surface — for example, the server has per-tool timeouts (`TIMEOUTS`)
+while the helper has a single wall-clock timeout (`DEFAULT_CLI_TIMEOUT`).
+
 ## Tools Reference
 
 ### `gemini_quick_query`
@@ -112,6 +135,37 @@ Directory-level analysis using the pro model.
 ```
 Scopes: `structure`, `security`, `performance`, `patterns`, `all`
 
+## Standalone CLI Helper
+
+`gemini_helper.py` exposes the same execution logic as the MCP server for
+direct terminal use (no MCP client required):
+
+```bash
+# Quick Q&A using the flash model
+python gemini_helper.py query "How does async/await work in Python?"
+python gemini_helper.py query "Refactor this loop" "for i in range(10): ..."
+
+# Single-file deep analysis using the pro model (path must be inside
+# GEMINI_MCP_ALLOWED_ROOTS or the current working directory)
+python gemini_helper.py analyze ./src/main.py
+python gemini_helper.py analyze ./src/auth.py security
+
+# Whole-directory analysis using the pro model
+python gemini_helper.py codebase ./src
+python gemini_helper.py codebase ./src patterns
+```
+
+| Subcommand | Args | Default | Notes |
+|---|---|---|---|
+| `query` | `<text> [context]` | — | Flash model; streams output. |
+| `analyze` | `<file_path> [analysis_type]` | `comprehensive` | Pro model. Types: `comprehensive`, `security`, `performance`, `architecture`. Max 80 KB / 800 lines. |
+| `codebase` | `<directory_path> [scope]` | `all` | Pro model. Scopes: `structure`, `security`, `performance`, `patterns`, `all`. |
+
+Output streams to stdout while progress and warnings go to stderr. Default
+wall-clock timeout is 300 s — override with `GEMINI_CLI_TIMEOUT`. A
+background thread drains stderr concurrently so the subprocess never
+deadlocks on a full stderr pipe.
+
 ## Windows-Specific Notes / Windows 注意事项
 
 ### Why call `node gemini.js` directly?
@@ -129,13 +183,32 @@ An alternative Node.js approach that wraps `@rlabs-inc/gemini-mcp` with proxy su
 
 ## Development
 
-```bash
-# Install pytest
-pip install -r requirements-dev.txt
+Install dev dependencies (adds `pytest`):
 
-# Run the test suite
+```bash
+pip install -r requirements-dev.txt
+```
+
+Run the suite:
+
+```bash
 pytest tests/
 ```
+
+39 cases in `tests/test_core.py` cover:
+
+- `sanitize_for_prompt` — preserves code/Markdown punctuation, caps length, strips NUL/ESC
+- `redact` — Google API keys (`AIzaSy…`), `sk-` tokens, Bearer tokens
+- `is_secret_filename` — 15 parameterised cases (`.env*`, `*.pem`, `*.key`, `id_rsa*`, `.npmrc`, `credentials*`, etc.)
+- `build_codebase_context` — secret-file content redaction, `IGNORED_DIRS` pruning, tree-entry cap, forward-slash path normalisation
+- `get_allowed_roots` / `path_within_allowed` / `validate_path_security` — env override, `os.pathsep` parsing, `..` traversal defence, empty-path rejection
+- `MODEL_ASSIGNMENTS` — MCP and helper task names present; dead keys (`pre_edit`, `pre_commit`, `session_summary`) confirmed removed
+
+## Acknowledgements
+
+- Reference project: [claude-gemini-mcp-slim](https://github.com/cmdaltctr/claude-gemini-mcp-slim)
+- MCP protocol: [Model Context Protocol](https://modelcontextprotocol.io/)
+- Gemini CLI: [@google/gemini-cli](https://www.npmjs.com/package/@google/gemini-cli)
 
 ## License
 

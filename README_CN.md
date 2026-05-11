@@ -89,6 +89,27 @@ python -m venv .venv
 | `HTTP_PROXY` | 否 | - | HTTP 代理地址 |
 | `HTTPS_PROXY` | 否 | - | HTTPS 代理地址 |
 
+## 项目结构
+
+```
+gemini-mcp-server/
+├── gemini_core.py          # 共享原语：CLI 解析、目录扫描、脱敏、
+│                           # 路径校验、凭据正则
+├── gemini_mcp_server.py    # MCP stdio 服务器 — Claude Code 使用
+├── gemini_helper.py        # 独立命令行工具（不依赖 MCP）
+├── tests/
+│   └── test_core.py        # gemini_core 的 39 项 pytest 套件
+├── examples/
+│   └── claude-config.json  # Claude Code MCP 配置示例
+├── proxy-wrapper/          # 已归档的 Node.js 代理 wrapper
+├── requirements.txt        # 运行时依赖（mcp、anyio、google-generativeai）
+└── requirements-dev.txt    # 开发依赖（额外加 pytest）
+```
+
+分层逻辑：`gemini_core` 拥有 MCP 服务器和 CLI 工具都需要的东西（子进程
+启动器、扫描器、路径校验等）。两个入口模块保持精简、可独立演化——比如
+服务器有按工具分级的 `TIMEOUTS`，而 CLI 工具用单一的 `DEFAULT_CLI_TIMEOUT`。
+
 ## 工具说明
 
 ### `gemini_quick_query` — 快速问答
@@ -111,6 +132,32 @@ python -m venv .venv
 ```
 分析范围：`structure`（结构）、`security`（安全）、`performance`（性能）、`patterns`（模式）、`all`（全部）
 
+## 命令行工具（gemini_helper.py）
+
+`gemini_helper.py` 提供与 MCP 服务器相同的执行逻辑，直接在终端使用（无需 MCP 客户端）：
+
+```bash
+# 使用 flash 模型快速问答
+python gemini_helper.py query "Python 的 async/await 是怎么工作的？"
+python gemini_helper.py query "帮我重构这段循环" "for i in range(10): ..."
+
+# 使用 pro 模型分析单文件（路径必须在 GEMINI_MCP_ALLOWED_ROOTS 或当前目录下）
+python gemini_helper.py analyze ./src/main.py
+python gemini_helper.py analyze ./src/auth.py security
+
+# 使用 pro 模型分析整个目录
+python gemini_helper.py codebase ./src
+python gemini_helper.py codebase ./src patterns
+```
+
+| 子命令 | 参数 | 默认值 | 说明 |
+|---|---|---|---|
+| `query` | `<文本> [上下文]` | — | Flash 模型；输出流式打印 |
+| `analyze` | `<文件路径> [分析类型]` | `comprehensive` | Pro 模型。类型：`comprehensive`、`security`、`performance`、`architecture`。最大 80KB / 800 行 |
+| `codebase` | `<目录路径> [范围]` | `all` | Pro 模型。范围：`structure`、`security`、`performance`、`patterns`、`all` |
+
+输出走 stdout，进度和警告走 stderr。默认 300 秒超时，可通过 `GEMINI_CLI_TIMEOUT` 覆盖。后台线程并发 drain stderr，避免子进程因 stderr 管道填满而死锁。
+
 ## Windows 注意事项
 
 ### 为什么直接调用 `node gemini.js`？
@@ -128,13 +175,26 @@ Gemini CLI 子进程默认继承父进程的 stdin。而 MCP 通过 stdio 进行
 
 ## 开发
 
-```bash
-# 安装开发依赖（含 pytest）
-pip install -r requirements-dev.txt
+安装开发依赖（额外引入 `pytest`）：
 
-# 运行测试
+```bash
+pip install -r requirements-dev.txt
+```
+
+运行测试：
+
+```bash
 pytest tests/
 ```
+
+`tests/test_core.py` 共 39 项用例，覆盖：
+
+- `sanitize_for_prompt` — 验证不破坏代码/Markdown 标点，长度截断生效，剥离 NUL/ESC
+- `redact` — Google API key（`AIzaSy…`）、`sk-` token、Bearer token 三种正则
+- `is_secret_filename` — 15 个参数化用例（`.env*`、`*.pem`、`*.key`、`id_rsa*`、`.npmrc`、`credentials*` 等）
+- `build_codebase_context` — 凭据文件内容跳过、`IGNORED_DIRS` 剪枝、tree 上限、正斜杠路径
+- `get_allowed_roots` / `path_within_allowed` / `validate_path_security` — env 覆盖、`os.pathsep` 解析、`..` traversal 拦截、空路径拒绝
+- `MODEL_ASSIGNMENTS` — MCP 工具名与 helper 短名都在；死键（`pre_edit` / `pre_commit` / `session_summary`）已删
 
 ## 致谢
 
