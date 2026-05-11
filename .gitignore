@@ -10,6 +10,8 @@ node_modules/
 .claude/
 .idea/
 .vscode/
+.pytest_cache/
+.mypy_cache/
 *.swp
 *.swo
 .DS_Store
